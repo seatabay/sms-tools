@@ -8,6 +8,9 @@ import dftModel as DFT
 import hprModel as HPR
 import stft as STFT
 
+import traitlets
+import ipywidgets as widget
+
 class Models:
 
     def __init__():
@@ -439,3 +442,190 @@ class Models:
             plt.autoscale(tight=True)
             plt.title('Sinusoidal + {} Spectrogram'.format(plot_type))
             plt.show()
+            
+
+
+class GuiController:
+    pass
+
+class GuiView:
+    
+    def __init__(self):
+        self.style = {'description_width': 'initial'}
+        self.window_type = widget.Dropdown(options=["Rectangular",
+                                 "Hanning",
+                                 "Hamming",
+                                 "Blackman",
+                                 "Blackmanharris"],
+                                disabled=False,
+                                 description="Window Type",
+                                 style=style)
+        self.window_size = widget.IntText(value=501
+                                      ,disabled=False,description="Window Size", style=style)
+        self.fft_size = widget.IntText(value=512,
+                                   disabled=False, description="FFT-Size", style=style)
+        self.time = widget.FloatText(value=0.2,
+                                 disabled=False, description="Time in sound (s)", style=style)
+        self.hop_size = widget.IntText(value=512, description="Hop Size", style=style)
+    
+        self.magnitude_threshold = widget.IntText(value=-80, description="Magnitude Threshold (t)", style=style)
+    
+        self.max_par_sinusoid = widget.IntText(value=150, 
+                                      description="Maximum number of parallel sinusoid",
+                                     style=style)
+    
+        self.min_dur_sinusoid = widget.FloatText(value=0.02, description="Minimum duration of sinusoidal track",
+                                       style=style)
+    
+        self.max_freq_dev = widget.IntText(value=10,description="Max frequency deviation in sinusoidal tracks",style=style)
+        
+        self.slope_freq_dev = widget.FloatText(value=0.0001,description="Slope of frequency deviation", style=style)
+        
+        self.min_harmonic_dur = widget.FloatText(value=0.1,
+                                           description="Minimum duration of harmonic tracks", style=style)
+        
+        self.max_harmonic_num = widget.IntText(value=100, description="Minimum number of harmonics", style=style)
+        
+        self.min_fundamental_freq = widget.IntText(value=130, description="Minimum fundamental frequency", style=style)
+        
+        self.max_fundamental_freq = widget.IntText(value=300, description="Maximum fundamental frequency", style=style)
+        
+        self.max_error_f0 = widget.IntText(value=7,description="Maximum error in f0 detection algorithm",style=style)
+        
+        self.max_freq_dev_harmonic = widget.FloatText(value=0.02, description="Maximum frequency deviation in harmonic tracks",
+                                                style=style)
+        
+        self.dec_factor = widget.FloatRangeSlider(value=(0,1), min=0.1, max=1,step=0.001, description="Decimation factor(bigger than 0)",
+                                            style=style)
+        
+        self.stochastic_app_fact = widget.FloatText(value=0.2, description="Stochastic approximation fact", style=style)
+                
+        
+        self.select_audio = widgets.FileUpload(
+            description="Select Audio File",
+            accept='.wav',  # Accepted file extension e.g. '.txt', '.pdf', 'image/*', 'image/*,.pdf'
+            multiple=False  # True to accept multiple files upload else False
+        )
+        
+    def create_vbox(self,children):
+        vbox = widget.VBox(children)
+        return vbox
+    
+    def create_button(self,button_name,button_style):
+        return widget.Button(description=button_name, button_style=button_style, layout=Layout(width='50%', height='40px'))
+    
+        tab_names = ["DFT","STFT","Sine","Harmonic", "Stochastic", "SPR", "SPS", "HPR", "HPS"]
+
+        magnitude_spectrum = create_button("Magnitude Spectrum","warning")
+        
+        magnitude_spectogram = create_button("Magnitude Spectogram","warning")
+        
+        stochastic_rep = create_button("Stochastic Representation","warning")
+        
+        input_sound = create_button("Play Input Sound", "warning")
+        
+        
+        idft_res = widget.Button(description="IDFT Synthesized Sound",button_style="warning",
+                              layout=Layout(width='50%', height='40px'))
+        
+        input_sound = widget.Button(description="Input Sound", button_style="success",
+                                   layout=Layout(width='50%', height='40px'))
+        output_sound = widget.Button(description="Output Sound", button_style="info",
+                                    layout=Layout(width='50%', height='40px'))
+        
+        phase_spectogram = widget.Button(description="Phase Spectogram", button_style="info",
+                                    layout=Layout(width='50%', height='40px'))
+    
+    
+    stft = widget.GridBox([select_audio,
+                                 window_type,
+                                window_size,
+                                fft_size,
+                                hop_size,
+                                input_sound,
+                                output_sound,
+                                magnitude_spectogram,
+                                phase_spectogram],layouts=widgets.Layout(grid_template_columns="repeat(2, 100px)"))
+    
+    sine = widget.VBox(children=[window_type,
+                                window_size,
+                                fft_size,
+                                magnitude_threshold,
+                                min_dur_sinusoid,
+                                max_par_sinusoid,
+                                max_freq_dev,
+                                slope_freq_dev])
+    
+    harmonic = widget.VBox(children=[window_type,
+                                    window_size,
+                                    fft_size,
+                                    magnitude_threshold,
+                                    min_harmonic_dur,
+                                    max_harmonic_num,
+                                    min_fundamental_freq,
+                                    max_fundamental_freq,
+                                    max_error_f0,
+                                    max_freq_dev_harmonic])
+    
+    stochastic = widget.VBox(children=[hop_size,
+                                      fft_size,
+                                      dec_factor])
+    
+    spr = widget.VBox(children=[window_type,
+                               window_size,
+                               fft_size,
+                               magnitude_threshold,
+                               min_dur_sinusoid,
+                               max_par_sinusoid,
+                               max_freq_dev,
+                               slope_freq_dev])
+    
+    sps = widget.VBox(children=[window_type,
+                               window_size,
+                               fft_size,
+                               magnitude_threshold,
+                               min_dur_sinusoid,
+                               max_par_sinusoid,
+                               max_freq_dev,
+                               slope_freq_dev,
+                               stochastic_app_fact])
+    hpr = widget.VBox(children=[window_type,
+                               window_size,
+                               fft_size,
+                               magnitude_threshold,
+                               min_harmonic_dur,
+                               max_harmonic_num,
+                               min_fundamental_freq,
+                               max_fundamental_freq,
+                               max_error_f0,
+                               max_freq_dev])
+    
+    hps = widget.VBox(children=[window_type,
+                               window_size,
+                               fft_size,
+                               magnitude_threshold,
+                               min_dur_sinusoid,
+                               max_harmonic_num,
+                               min_fundamental_freq,
+                               max_fundamental_freq,
+                               max_error_f0,
+                               max_freq_dev_harmonic,
+                               stochastic_app_fact])
+    
+    dft = widget.VBox(children=[window_type,
+                                window_size,
+                                fft_size,
+                                time,
+                                magnitude_spectrum,
+                                input_sound,
+                                output_sound
+                                ])
+    
+    tab = widget.Tab(children=[dft,stft,sine,harmonic,stochastic,spr,sps,hpr,hps])
+    tab_names = ["DFT","STFT","SINE","HARMONIC","STOCHASTIC","SPR","SPS","HPR","HPS"]
+            
+    for tab_no, tab_name in zip(range(len(tab_names)),tab_names):
+        tab.set_title(tab_no, tab_name)
+        
+    
+    widget.VBox(children=[tab])
