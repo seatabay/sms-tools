@@ -1,22 +1,27 @@
 import numpy as np
+import numpy
 import matplotlib.pyplot as plt
 from scipy.signal import get_window
 import os, sys
 sys.path.append(os.path.join('../models/'))
 import utilFunctions as UF
-import dftModel as DFT
-import hprModel as HPR
-import stft as STFT
 
-import traitlets
 import ipywidgets as widget
+from traitlets import link, HasTraits
+from IPython.display import display
+from traitlets import *
+import math
+import ipywidgets as widgets
+import dftModel as DFT
+import stft as STFT
+import json
+from collections import defaultdict
+import pathlib
+from ipywidgets import Layout
 
-class Models:
-
-    def __init__():
-        pass
-
-    def dft_model(inputFile, window, M, N, time):
+class GuisModels:
+    
+    def dft(self, inputFile, window, M, N, time=0):
         fs, x = UF.wavread(inputFile)
 
         # compute analysis window
@@ -33,11 +38,37 @@ class Models:
 
         # compute the inverse dft of the spectrum
         y = DFT.dftSynth(mX, pX, w.size)*sum(w)
-
+        
         return fs, x1, mX, pX, y
+    
+    
+    def stft(self,inputFile = '../../sounds/piano.wav', window = 'hamming', M = 1024, N = 1024, H = 512):
+        """
+        analysis/synthesis using the STFT
+        inputFile: input sound file (monophonic with sampling rate of 44100)
+        window: analysis window type (choice of rectangular, hanning, hamming, blackman, blackmanharris)
+        M: analysis window size
+        N: fft size (power of two, bigger or equal than M)
+        H: hop size (at least 1/2 of analysis window size to have good overlap-add)
+        """
 
-    def harmonic_model(inputFile='../../sounds/vignesh.wav', window='blackman', M=1201, N=2048, t=-90,
-    minSineDur=0.1, nH=100, minf0=130, maxf0=300, f0et=7, harmDevSlope=0.01):
+        # read input sound (monophonic with sampling rate of 44100)
+        fs, x = UF.wavread(inputFile)
+
+        # compute analysis window
+        w = get_window(window, M)
+
+        # compute the magnitude and phase spectrogram
+
+        mX, pX = STFT.stftAnal(x, w, N, H)
+
+        # perform the inverse stft
+        y = STFT.stftSynth(mX, pX, M, H)
+        
+        return fs, mX, pX, y
+    
+    def harmonic(inputFile, window, M, N, t,
+    minSineDur, nH, minf0, maxf0, f0et, harmDevSlope):
 
         # size of fft used in synthesis
         Ns = 512
@@ -57,17 +88,11 @@ class Models:
         # synthesize the harmonics
         y = SM.sineModelSynth(hfreq, hmag, hphase, Ns, H, fs)
 
-        # output sound file (monophonic with sampling rate of 44100)
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_harmonicModel.wav'
-
-        # write the sound resulting from harmonic analysis
-        UF.wavwrite(y, fs, outputFile)
-
         return fs, x, hfreq, y
 
 
-    def hpr_model(inputFile='../../sounds/sax-phrase-short.wav', window='blackman', M=601, N=1024, t=-100,
-    minSineDur=0.1, nH=100, minf0=350, maxf0=700, f0et=5, harmDevSlope=0.01):
+    def hpr(inputFile, window, M, N, t,
+    minSineDur, nH, minf0, maxf0, f0et, harmDevSlope):
             # size of fft used in synthesis
         Ns = 512
 
@@ -89,19 +114,9 @@ class Models:
         # synthesize hpr model
         y, yh = HPR.hprModelSynth(hfreq, hmag, hphase, xr, Ns, H, fs)
 
-        # output sound file (monophonic with sampling rate of 44100)
-        outputFileSines = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_hprModel_sines.wav'
-        outputFileResidual = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_hprModel_residual.wav'
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_hprModel.wav'
-
-        # write sounds files for harmonics, residual, and the sum
-        UF.wavwrite(yh, fs, outputFileSines)
-        UF.wavwrite(xr, fs, outputFileResidual)
-        UF.wavwrite(y, fs, outputFile)
-
         return fs, x, mXr, hfreq
 
-    def hps_model():
+    def hps():
             # size of fft used in synthesis
         Ns = 512
 
@@ -120,19 +135,9 @@ class Models:
         # synthesize a sound from the harmonic plus stochastic representation
         y, yh, yst = HPS.hpsModelSynth(hfreq, hmag, hphase, stocEnv, Ns, H, fs)
 
-        # output sound file (monophonic with sampling rate of 44100)
-        outputFileSines = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_hpsModel_sines.wav'
-        outputFileStochastic = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_hpsModel_stochastic.wav'
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_hpsModel.wav'
-
-        # write sounds files for harmonics, stochastic, and the sum
-        UF.wavwrite(yh, fs, outputFileSines)
-        UF.wavwrite(yst, fs, outputFileStochastic)
-        UF.wavwrite(y, fs, outputFile)
-
         return fs, x, y, stocEnv
 
-    def sine_model():
+    def sine():
         # size of fft used in synthesis
         Ns = 512
 
@@ -150,16 +155,12 @@ class Models:
 
         # synthesize the output sound from the sinusoidal representation
         y = SM.sineModelSynth(tfreq, tmag, tphase, Ns, H, fs)
-
-        # output sound file name
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_sineModel.wav'
-
-        # write the synthesized sound obtained from the sinusoidal synthesis
-        UF.wavwrite(y, fs, outputFile)
+        
+        return fs, x, tfreq, y
 
 
-    def spr_model(inputFile='../../sounds/bendir.wav', window='hamming', M=2001, N=2048, t=-80,
-        minSineDur=0.02, maxnSines=150, freqDevOffset=10, freqDevSlope=0.001):
+    def spr(inputFile, window, M, N, t,
+        minSineDur, maxnSines, freqDevOffset, freqDevSlope):
         """
         inputFile: input sound file (monophonic with sampling rate of 44100)
         window: analysis window type (rectangular, hanning, hamming, blackman, blackmanharris)
@@ -193,20 +194,10 @@ class Models:
         # sum sinusoids and residual
         y, ys = SPR.sprModelSynth(tfreq, tmag, tphase, xr, Ns, H, fs)
 
-        # output sound file (monophonic with sampling rate of 44100)
-        outputFileSines = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_sprModel_sines.wav'
-        outputFileResidual = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_sprModel_residual.wav'
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_sprModel.wav'
+        return fs, x, tfreq, mXr, pXr, y, ys
 
-        # write sounds files for sinusoidal, residual, and the sum
-        UF.wavwrite(ys, fs, outputFileSines)
-        UF.wavwrite(xr, fs, outputFileResidual)
-        UF.wavwrite(y, fs, outputFile)
-
-        return None
-
-    def sps_model(inputFile='../../sounds/bendir.wav', window='hamming', M=2001, N=2048, t=-80, minSineDur=0.02,
-    maxnSines=150, freqDevOffset=10, freqDevSlope=0.001, stocf=0.2):
+    def sps(inputFile, window, M, N, t, minSineDur,
+    maxnSines, freqDevOffset, freqDevSlope, stocf):
         """
         inputFile: input sound file (monophonic with sampling rate of 44100)
         window: analysis window type (rectangular, hanning, hamming, blackman, blackmanharris)
@@ -236,49 +227,9 @@ class Models:
         # synthesize sinusoidal+stochastic model
         y, ys, yst = SPS.spsModelSynth(tfreq, tmag, tphase, stocEnv, Ns, H, fs)
 
-        # output sound file (monophonic with sampling rate of 44100)
-        outputFileSines = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_spsModel_sines.wav'
-        outputFileStochastic = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_spsModel_stochastic.wav'
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_spsModel.wav'
+        return fs, x, tfreq, y, ys, yst
 
-        # write sounds files for sinusoidal, residual, and the sum
-        UF.wavwrite(ys, fs, outputFileSines)
-        UF.wavwrite(yst, fs, outputFileStochastic)
-        UF.wavwrite(y, fs, outputFile)
-
-        return None
-
-    def stft_model(inputFile = '../../sounds/piano.wav', window = 'hamming', M = 1024, N = 1024, H = 512):
-        """
-        analysis/synthesis using the STFT
-        inputFile: input sound file (monophonic with sampling rate of 44100)
-        window: analysis window type (choice of rectangular, hanning, hamming, blackman, blackmanharris)
-        M: analysis window size
-        N: fft size (power of two, bigger or equal than M)
-        H: hop size (at least 1/2 of analysis window size to have good overlap-add)
-        """
-
-        # read input sound (monophonic with sampling rate of 44100)
-        fs, x = UF.wavread(inputFile)
-
-        # compute analysis window
-        w = get_window(window, M)
-
-        # compute the magnitude and phase spectrogram
-
-        mX, pX = STFT.stftAnal(x, w, N, H)
-
-        # perform the inverse stft
-        y = STFT.stftSynth(mX, pX, M, H)
-
-        # output sound file (monophonic with sampling rate of 44100)
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_stft.wav'
-
-        # write the sound resulting from the inverse stft
-        UF.wavwrite(y, fs, outputFile)
-
-        return None
-    def stochastic_model(inputFile='../../sounds/ocean.wav', H=256, N=512, stocf=.1):
+    def stochastic(inputFile, H, N, stocf=.1):
         """
         inputFile: input sound file (monophonic with sampling rate of 44100)
         H: hop size, N: fft size
@@ -294,12 +245,7 @@ class Models:
         # synthesize sound from stochastic model
         y = STM.stochasticModelSynth(stocEnv, H, N)
 
-        outputFile = 'output_sounds/' + os.path.basename(inputFile)[:-4] + '_stochasticModel.wav'
-
-        # write output sound
-        UF.wavwrite(y, fs, outputFile)
-
-        return None
+        return fs, x, stocEnv, y
 
 
     def plot_sound(x, fs, M, audio_filename, time=0):
@@ -327,7 +273,7 @@ class Models:
         plt.show()
 
 
-    def plot_magnitude_phase_spectrum(fs, mag_phase, N,spec_type="Magnitude"):
+    def plot_magnitude_phase_spectrum(self,fs, mag_phase, N, spec_type="Magnitude"):
         """
         Plot magnitude or phase spectrum.
 
@@ -343,7 +289,7 @@ class Models:
             y_label = "Amplitude (dB)"
         elif spec_type.lower() == "phase":
             y_label = "Phase (radians)"
-
+        mag_phase = np.array(mag_phase)
         plt.plot(float(fs)*np.arange(mag_phase.size)/float(N), mag_phase, 'r')
         plt.axis([0, fs/2.0, min(mag_phase), max(mag_phase)])
         plt.ylabel(y_label)
@@ -352,24 +298,14 @@ class Models:
         plt.show()
 
 
-    def plot_magnitude_spectogram(fs, N, H, mXr, max_plot_freq=4000, figsize=(15,5), freq=None, plot_type=None):
+    def plot_magnitude_spectogram(fs, N, mXr, max_plot_freq=4000.0,figsize=(15,5)):
         max_plot_bin = int(N * max_plot_freq / fs)
-        maxplotbin = int(N*max_plot_freq/fs)
         num_frames = int(mXr[:,0].size)
         frame_time = H * np.arange(num_frames) / float(fs)
         bin_freq = np.arange(max_plot_bin + 1) * float(fs) / N
         plt.figure(figsize=figsize)
         plt.pcolormesh(frame_time, bin_freq, np.transpose(mXr[:,:maxplotbin+1]))
         plt.autoscale(tight=True)
-        plt.xlabel("Time (s)")
-        plt.ylabel("Frequency (Hz)")
-        
-        if plot_type == "H":
-            Models.plot_harmonic_on_top(freq,fs,H,freq_type="Residual")
-        elif plot_type == "S":
-            Models.plot_sinusoidal_on_top(freq,frame_time,max_plot_freq,plot_type="Residual")
-        else:
-            plt.title("Magnitude Spectogram")
         plt.show()
 
     def plot_stochastic_spectogram(stocEnv, fs, H, max_plot_freq=5000):
@@ -408,11 +344,10 @@ class Models:
             plt.axis([0, x.size/float(fs), 0, max_plot_freq])
             plt.title('Frequencies of {} Tracks'.format(freq_type.capitalize()))
 
-            
 
     def plot_harmonic_on_top(hfreq, fs, H, color='k', alpha=1, max_plot_freq=4000, freq_type='Stochastic'):
             if hfreq.shape[1] > 0:
-                harms = hfreq*np.less(hfreq, max_plot_freq)
+                harms = hfreq*np.less(freq, max_plot_freq)
                 harms[harms == 0] = np.nan
                 num_frames = int(harms[:,0].size)
                 frame_time = H * np.arange(num_frames) / float(fs)
@@ -422,35 +357,116 @@ class Models:
                 plt.autoscale(tight=True)
                 plt.title('Harmonics + {} Spectogram'.format(freq_type))
 
-    def plot_sinusoidal_on_top(tfreq,frame_time,max_plot_freq=5000,plot_type="Stochastic"):
+    def plot_sinusoidal_stochastic():
 
         if (tfreq.shape[1] > 0):
-            sines_tracks = tfreq*np.less(tfreq,max_plot_freq)
-
-            if plot_type == "Stochastic":
-                sines_tracks[sines_tracks==0] = np.nan
-                num_frames = int(sines[:,0].size)
-                frame_time = H*np.arange(num_frames)/float(fs)
-            
-            if plot_type == "Residual":
-                sines_tracks = tfreq*np.less(tfreq, max_plot_freq)
-                sines_tracks[sines_tracks<=0] = np.nan
-            
-            plt.plot(frame_time, sines_tracks, color='k', ms=3, alpha=1)
+            sines = tfreq*np.less(tfreq,maxplotfreq)
+            sines[sines==0] = np.nan
+            numFrames = int(sines[:,0].size)
+            frmTime = H*np.arange(numFrames)/float(fs)
+            plt.plot(frmTime, sines, color='k', ms=3, alpha=1)
             plt.xlabel('Time (s)')
             plt.ylabel('Frequency(Hz)')
             plt.autoscale(tight=True)
-            plt.title('Sinusoidal + {} Spectrogram'.format(plot_type))
-            plt.show()
+            plt.title('Sinusoidal + Stochastic Spectrogram')
+
+
+    def plot_sinusoidal_residual():
+        if (tfreq.shape[1] > 0):
+            tracks = tfreq*np.less(tfreq, maxplotfreq)
+            tracks[tracks<=0] = np.nan
+            plt.plot(frmTime, tracks, color='k')
+            plt.title('sinusoidal tracks + residual spectrogram')
+            plt.autoscale(tight=True)
+
             
 
 
 class GuiController:
-    pass
+    
+    def read_json(self,filename):
+        f = open(filename, "r") 
+        data = json.loads(f.read()) 
+        return data
+    
+    def limit_computation_number(self,json_file,data,key):
+        json_key = [key for key in json_file.keys()]
+        if len(json_file.keys()) < GuiView.KEEP_TRACK:
+            json_file[key] = data
+        else:
+            del json_file[json_key[0]]
+            json_file[key] = data
+        return json_file
+    
+    def update_json(self,data, key):
+        with open(f"{GuiView.DIR_NAME}/results.json".format(GuiView.DIR_NAME), 'r+') as f:
+            json_data = json.load(f)
+            json_data = self.limit_computation_number(json_data,data,key)
+            f.seek(0)
+            f.write(json.dumps(json_data))
+            f.truncate()
+            
+    def compute_model_results(self,json, result_dict, model_dict,filename,call_model):
+        #If model results are already computed, return it
+        if len(json.keys()) != 0 and filename in json.keys():
+            result_dict = json[filename]
+        #Otherwise compute the results
+        else:
+            results = call_model(*tuple(result_dict.values()))
+            for result,key in zip(results,model_dict.keys()):
+                print(key)
+                if isinstance(result,numpy.ndarray):
+                    result_dict[key] = result.tolist()
+                else:
+                    result_dict[key] = result                
+            #Keep the number of computations stable
+            self.update_json(result_dict, filename)
+        return result_dict
+
+    def create_json(self,json_filepath):
+        if not pathlib.Path(json_filepath).exists():
+            #If no JSON is created, create one
+            dump_json(defaultdict(dict),json_filepath)
+            json = self.read_json(f"{GuiView.DIR_NAME}/results.json")
+        else:
+            #Otherwise read the json file
+            json = self.read_json(json_filepath)
+        return json
+
+    def get_selected_audio_filename(self,widget):
+        audio_filename = [audio for audio in widget.value.keys()]
+        return audio_filename[0]
+
+    def dump_json(self,data, filename):
+         with open(filename, 'w') as fp:
+            json.dump(data, fp, indent=4)
+
+    def create_dir(self,dir_name):
+        dir_name = "{}".format(dir_name)
+        if not os.path.isdir(dir_name):
+            os.mkdir(dir_name)
+
 
 class GuiView:
     
-    def __init__(self):
+    DFT = dict.fromkeys(["fs","x1","mX","pX","y"])
+    STFT = dict.fromkeys(["fs","mX","pX","y"])
+    HARMONIC = dict.fromkeys(["fs","x","hfreq","y"])
+    HPR = dict.fromkeys(["fs","x","mXr","hfreq"])
+    HPS = dict.fromkeys(["fs","x","y","stocenv"])
+    SINE = dict.fromkeys(["fs","x","tfreq","y"])
+    SPR = dict.fromkeys(["fs","x","tfreq","mXr","pXr","y","ys"])
+    STOCHASTIC = dict.fromkeys(["fs","x","stocenv","y"])
+    DIR_NAME = "Results"
+    KEEP_TRACK = 3
+    
+    
+    def __init__(self, model, controller):
+        
+        self.model = model
+        self.controller = controller
+        
+        self.fft_value = [2**n for n in range(2,20)]
         self.style = {'description_width': 'initial'}
         self.window_type = widget.Dropdown(options=["Rectangular",
                                  "Hanning",
@@ -459,70 +475,64 @@ class GuiView:
                                  "Blackmanharris"],
                                 disabled=False,
                                  description="Window Type",
-                                 style=style)
+                                 style=self.style)
         self.window_size = widget.IntText(value=501
-                                      ,disabled=False,description="Window Size", style=style)
-        self.fft_size = widget.IntText(value=512,
-                                   disabled=False, description="FFT-Size", style=style)
+                                      ,disabled=False,description="Window Size (M)", style=self.style)
+        self.fft_size = widget.Dropdown(options=self.fft_value,
+                                   disabled=False, description="FFT-Size (N)", style=self.style)
         self.time = widget.FloatText(value=0.2,
-                                 disabled=False, description="Time in sound (s)", style=style)
-        self.hop_size = widget.IntText(value=512, description="Hop Size", style=style)
+                                 disabled=False, description="Time in sound (s)", style=self.style)
+        self.hop_size = widget.IntText(value=512, description="Hop Size (H)", style=self.style)
     
-        self.magnitude_threshold = widget.IntText(value=-80, description="Magnitude Threshold (t)", style=style)
+        self.magnitude_threshold = widget.IntText(value=-80, description="Magnitude Threshold (t)", style=self.style)
     
         self.max_par_sinusoid = widget.IntText(value=150, 
                                       description="Maximum number of parallel sinusoid",
-                                     style=style)
+                                     style=self.style)
     
         self.min_dur_sinusoid = widget.FloatText(value=0.02, description="Minimum duration of sinusoidal track",
-                                       style=style)
+                                       style=self.style)
     
-        self.max_freq_dev = widget.IntText(value=10,description="Max frequency deviation in sinusoidal tracks",style=style)
+        self.max_freq_dev = widget.IntText(value=10,description="Max frequency deviation in sinusoidal tracks",style=self.style)
         
-        self.slope_freq_dev = widget.FloatText(value=0.0001,description="Slope of frequency deviation", style=style)
+        self.slope_freq_dev = widget.FloatText(value=0.0001,description="Slope of frequency deviation", style=self.style)
         
         self.min_harmonic_dur = widget.FloatText(value=0.1,
-                                           description="Minimum duration of harmonic tracks", style=style)
+                                           description="Minimum duration of harmonic tracks", style=self.style)
         
-        self.max_harmonic_num = widget.IntText(value=100, description="Minimum number of harmonics", style=style)
+        self.max_harmonic_num = widget.IntText(value=100, description="Minimum number of harmonics", style=self.style)
         
-        self.min_fundamental_freq = widget.IntText(value=130, description="Minimum fundamental frequency", style=style)
+        self.min_fundamental_freq = widget.IntText(value=130, description="Minimum fundamental frequency", style=self.style)
         
-        self.max_fundamental_freq = widget.IntText(value=300, description="Maximum fundamental frequency", style=style)
+        self.max_fundamental_freq = widget.IntText(value=300, description="Maximum fundamental frequency", style=self.style)
         
-        self.max_error_f0 = widget.IntText(value=7,description="Maximum error in f0 detection algorithm",style=style)
+        self.max_error_f0 = widget.IntText(value=7,description="Maximum error in f0 detection algorithm",style=self.style)
         
         self.max_freq_dev_harmonic = widget.FloatText(value=0.02, description="Maximum frequency deviation in harmonic tracks",
-                                                style=style)
+                                                style=self.style)
         
         self.dec_factor = widget.FloatRangeSlider(value=(0,1), min=0.1, max=1,step=0.001, description="Decimation factor(bigger than 0)",
-                                            style=style)
+                                            style=self.style)
         
-        self.stochastic_app_fact = widget.FloatText(value=0.2, description="Stochastic approximation fact", style=style)
+        self.stochastic_app_fact = widget.FloatText(value=0.2, description="Stochastic approximation fact", style=self.style)
                 
         
         self.select_audio = widgets.FileUpload(
             description="Select Audio File",
-            accept='.wav',  # Accepted file extension e.g. '.txt', '.pdf', 'image/*', 'image/*,.pdf'
-            multiple=False  # True to accept multiple files upload else False
+            accept='.wav',  
+            multiple=False  
         )
         
-    def create_vbox(self,children):
-        vbox = widget.VBox(children)
-        return vbox
-    
-    def create_button(self,button_name,button_style):
-        return widget.Button(description=button_name, button_style=button_style, layout=Layout(width='50%', height='40px'))
-    
-        tab_names = ["DFT","STFT","Sine","Harmonic", "Stochastic", "SPR", "SPS", "HPR", "HPS"]
+        compute = widget.Button(description="Compute", button_style="warning", layout=widgets.Layout(width='50%', height='40px'))
+        mag_spectrum = widget.Button(description="Magnitude Spectrum", button_style="warning", layout=widgets.Layout(width='50%', height='40px'))
+        mag_spectogram = widget.Button(description="Magnitude Spectogram", button_style="warning", layout=widgets.Layout(width='50%', height='40px'))
 
-        magnitude_spectrum = create_button("Magnitude Spectrum","warning")
+
+        stochastic_rep = widget.Button(description="Stochastic Representation", button_style="info",
+                                    layout=Layout(width='50%', height='40px'))
         
-        magnitude_spectogram = create_button("Magnitude Spectogram","warning")
-        
-        stochastic_rep = create_button("Stochastic Representation","warning")
-        
-        input_sound = create_button("Play Input Sound", "warning")
+        input_sound = widget.Button(description="Play Input Sound", button_style="info",
+                                    layout=Layout(width='50%', height='40px'))
         
         
         idft_res = widget.Button(description="IDFT Synthesized Sound",button_style="warning",
@@ -536,96 +546,164 @@ class GuiView:
         phase_spectogram = widget.Button(description="Phase Spectogram", button_style="info",
                                     layout=Layout(width='50%', height='40px'))
     
-    
-    stft = widget.GridBox([select_audio,
-                                 window_type,
-                                window_size,
-                                fft_size,
-                                hop_size,
-                                input_sound,
-                                output_sound,
-                                magnitude_spectogram,
-                                phase_spectogram],layouts=widgets.Layout(grid_template_columns="repeat(2, 100px)"))
-    
-    sine = widget.VBox(children=[window_type,
-                                window_size,
-                                fft_size,
-                                magnitude_threshold,
-                                min_dur_sinusoid,
-                                max_par_sinusoid,
-                                max_freq_dev,
-                                slope_freq_dev])
-    
-    harmonic = widget.VBox(children=[window_type,
-                                    window_size,
-                                    fft_size,
-                                    magnitude_threshold,
-                                    min_harmonic_dur,
-                                    max_harmonic_num,
-                                    min_fundamental_freq,
-                                    max_fundamental_freq,
-                                    max_error_f0,
-                                    max_freq_dev_harmonic])
-    
-    stochastic = widget.VBox(children=[hop_size,
-                                      fft_size,
-                                      dec_factor])
-    
-    spr = widget.VBox(children=[window_type,
-                               window_size,
-                               fft_size,
-                               magnitude_threshold,
-                               min_dur_sinusoid,
-                               max_par_sinusoid,
-                               max_freq_dev,
-                               slope_freq_dev])
-    
-    sps = widget.VBox(children=[window_type,
-                               window_size,
-                               fft_size,
-                               magnitude_threshold,
-                               min_dur_sinusoid,
-                               max_par_sinusoid,
-                               max_freq_dev,
-                               slope_freq_dev,
-                               stochastic_app_fact])
-    hpr = widget.VBox(children=[window_type,
-                               window_size,
-                               fft_size,
-                               magnitude_threshold,
-                               min_harmonic_dur,
-                               max_harmonic_num,
-                               min_fundamental_freq,
-                               max_fundamental_freq,
-                               max_error_f0,
-                               max_freq_dev])
-    
-    hps = widget.VBox(children=[window_type,
-                               window_size,
-                               fft_size,
-                               magnitude_threshold,
-                               min_dur_sinusoid,
-                               max_harmonic_num,
-                               min_fundamental_freq,
-                               max_fundamental_freq,
-                               max_error_f0,
-                               max_freq_dev_harmonic,
-                               stochastic_app_fact])
-    
-    dft = widget.VBox(children=[window_type,
-                                window_size,
-                                fft_size,
-                                time,
-                                magnitude_spectrum,
-                                input_sound,
-                                output_sound
-                                ])
-    
-    tab = widget.Tab(children=[dft,stft,sine,harmonic,stochastic,spr,sps,hpr,hps])
-    tab_names = ["DFT","STFT","SINE","HARMONIC","STOCHASTIC","SPR","SPS","HPR","HPS"]
-            
-    for tab_no, tab_name in zip(range(len(tab_names)),tab_names):
-        tab.set_title(tab_no, tab_name)
+
+        self.dft = widget.VBox(children=[self.window_type,
+                                    self.window_size,
+                                    self.fft_size,
+                                    self.time,
+                                    self.select_audio,
+                                    compute,
+                                    mag_spectrum
+                                    ])
+        self.stft = widget.GridBox([self.window_type,
+                                self.window_size,
+                                self.fft_size,
+                                self.hop_size,
+                                self.select_audio,
+                                compute,
+                                mag_spectogram
+                                ],layouts=widgets.Layout(grid_template_columns="repeat(2, 100px)"))
         
+        self.sine = widget.VBox(children=[self.window_type,
+                            self.window_size,
+                            self.fft_size,
+                            self.magnitude_threshold,
+                            self.min_dur_sinusoid,
+                            self.max_par_sinusoid,
+                            self.max_freq_dev,
+                            self.slope_freq_dev])
+
+        self.harmonic = widget.VBox(children=[self.window_type,
+                                        self.window_size,
+                                        self.fft_size,
+                                        self.magnitude_threshold,
+                                        self.min_harmonic_dur,
+                                        self.max_harmonic_num,
+                                        self.min_fundamental_freq,
+                                        self.max_fundamental_freq,
+                                        self.max_error_f0,
+                                        self.max_freq_dev_harmonic])
+
+        self.stochastic = widget.VBox(children=[self.hop_size,
+                                          self.fft_size,
+                                          self.dec_factor])
+
+        self.spr = widget.VBox(children=[self.window_type,
+                                   self.window_size,
+                                   self.fft_size,
+                                   self.magnitude_threshold,
+                                   self.min_dur_sinusoid,
+                                   self.max_par_sinusoid,
+                                   self.max_freq_dev,
+                                   self.slope_freq_dev])
+
+        self.sps = widget.VBox(children=[self.window_type,
+                                   self.window_size,
+                                   self.fft_size,
+                                   self.magnitude_threshold,
+                                   self.min_dur_sinusoid,
+                                   self.max_par_sinusoid,
+                                   self.max_freq_dev,
+                                   self.slope_freq_dev,
+                                   self.stochastic_app_fact])
+        self.hpr = widget.VBox(children=[self.window_type,
+                                   self.window_size,
+                                   self.fft_size,
+                                   self.magnitude_threshold,
+                                   self.min_harmonic_dur,
+                                   self.max_harmonic_num,
+                                   self.min_fundamental_freq,
+                                   self.max_fundamental_freq,
+                                   self.max_error_f0,
+                                   self.max_freq_dev])
+
+        self.hps = widget.VBox(children=[self.window_type,
+                                   self.window_size,
+                                   self.fft_size,
+                                   self.magnitude_threshold,
+                                   self.min_dur_sinusoid,
+                                   self.max_harmonic_num,
+                                   self.min_fundamental_freq,
+                                   self.max_fundamental_freq,
+                                   self.max_error_f0,
+                                   self.max_freq_dev_harmonic,
+                                   self.stochastic_app_fact])
+
+        
+        self.tab = widget.Tab(children=[self.dft,self.stft,self.sine,self.harmonic,self.stochastic,self.spr,self.sps,self.hpr,self.hps])
+        tab_names = ["DFT","STFT","SINE","HARMONIC","STOCHASTIC","SPR","SPS","HPR","HPS"]
+
+
+        for tab_no, tab_name in zip(range(len(tab_names)),tab_names):
+            self.tab.set_title(tab_no, tab_name)
+            
+        self.ipyview = widget.VBox(children=[self.tab])
+        
+        self.model_dict = {0:"dft",1:"stft"}
+
+        
+        def compute_results():
+            
+            #Create directory for results to be saved
+            #If it does not exist
+            self.controller.create_dir(GuiView.DIR_NAME)
+            
+            #Create a dictionary to save the results
+            #Along with their keys
+            self.result_dict = defaultdict(dict)
+            
+            """
+            try:
+                input_file = [audio for audio in self.select_audio.value.keys()]
+            except ValueError:
+                print("Select an audio!")
+            if input_file != []:   
+                self.dict["input_file"] = pathlib.Path(input_file[0]).with_suffix("")
+            """
+            
+            #Get the model name to be used for computation
+            self.model_name = self.model_dict[self.tab.selected_index]
+            
+            #Get the model function
+            model = getattr(self, self.model_name)
+            call_model = getattr(self.model, self.model_name)
+            self.result_dict["input_file"] = self.controller.get_selected_audio_filename(self.select_audio)
+            
+            #Update the result dict with model parameters
+            for item in model.children:
+                if not hasattr(item,'button_style'):
+                    if type(item.value) is str:
+                        self.result_dict[item.description] = item.value.lower()
+                    else:
+                        self.result_dict[item.description] = item.value
+            
+            #Create the filename containing parameter values
+            filename_structure = str("{}_" * (len(self.result_dict.values())+1))
+            filename = filename_structure.format(self.model_name,*list(self.result_dict.values()))
+            
+            #Create a dictionary with relevant model parameters
+            model_dict = getattr(GuiView, self.model_name.upper())
+            
+            #Create the json filepath
+            json_filepath = pathlib.Path(GuiView.DIR_NAME + "/results.json")
+            
+            json = self.controller.create_json(json_filepath)
+            
+            self.result_dict = self.controller.compute_model_results(json, self.result_dict, model_dict, filename, call_model)
+            
+            return self.result_dict
+                
+                
+        @mag_spectrum.on_click
+        def plot(_):
+            results = compute_results()
+            self.model.plot_magnitude_phase_spectrum(results["fs"],results["mX"],results["Window Size (M)"])
+
+        @mag_spectogram.on_click
+        def plot_mag(_):
+            results = compute_results()
+            self.model.plot_magnitude_spectogram(results["fs"],results["N"], results["mX"])
+
+        def display(self):
+            display(self.ipyview)
     
-    widget.VBox(children=[tab])
