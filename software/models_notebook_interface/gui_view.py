@@ -66,7 +66,7 @@ class GuiView:
         )
 
         self.slope_freq_dev = widget.FloatText(
-            value=0.0001, description="Slope of frequency deviation", style=self.style,
+            value=0.01, description="Slope of frequency deviation", style=self.style,
             description_tooltip="freqDevSlope"
         )
 
@@ -116,7 +116,8 @@ class GuiView:
         )
 
         self.stochastic_app_fact = widget.FloatText(
-            value=0.2, description="Stochastic approximation fact", style=self.style
+            value=0.2, description="Stochastic approximation fact", style=self.style,
+            description_tooltip="stocf"
         )
 
         self.input_file = widgets.FileUpload(
@@ -129,35 +130,40 @@ class GuiView:
             button_style="warning",
             layout=widgets.Layout(width="50%", height="40px"),
         )
-        self.mag_spectogram = widget.Button(
-            description="Magnitude Spectogram",
-            button_style="warning",
-            layout=widgets.Layout(width="50%", height="40px"),
-        )
         self.phase_spectrum = widget.Button(
             description="Phase Spectrum",
             button_style="warning",
             layout=widgets.Layout(width="50%", height="40px"),
         )
+        self.mag_spectogram = widget.Button(
+            description="Magnitude Spectogram",
+            button_style="warning",
+            layout=widgets.Layout(width="50%", height="40px"),
+        )
+        self.phase_spectogram = widget.Button(
+            description="Phase Spectogram",
+            button_style="warning",
+            layout=widgets.Layout(width="50%", height="40px"),
+        )
 
-        stochastic_rep = widget.Button(
+        self.stochastic_rep = widget.Button(
             description="Stochastic Representation",
             button_style="info",
             layout=Layout(width="50%", height="40px"),
         )
 
-        sinusoidal_tracks = widget.Button(
+        self.sinusoidal_tracks = widget.Button(
             description="Frequencies of Sinusoidal Tracks",
             button_style="info",
             layout=Layout(width="50%", height="40px"),
         )
-        harmonic_tracks = widget.Button(
+        self.harmonic_tracks = widget.Button(
             description="Frequencies of Harmonic Tracks",
             button_style="info",
             layout=Layout(width="50%", height="40px"),
         )
 
-        idft_res = widget.Button(
+        self.idft_res = widget.Button(
             description="IDFT Synthesized Sound",
             button_style="warning",
             layout=Layout(width="50%", height="40px"),
@@ -174,34 +180,49 @@ class GuiView:
             layout=Layout(width="50%", height="40px"),
         )
 
-        phase_spectogram = widget.Button(
+        self.phase_spectogram = widget.Button(
             description="Phase Spectogram",
             button_style="info",
             layout=Layout(width="50%", height="40px"),
         )
 
-        sinusoidal_audio = widget.Button(
+        self.sinusoidal_audio = widget.Button(
             description="Sinusoidal Output",
             button_style="success",
             layout=Layout(width="50%", height="40px"),
         )
-        residual_audio = widget.Button(
+        self.residual_audio = widget.Button(
             description="Residual Output",
             button_style="success",
             layout=Layout(width="50%", height="40px"),
         )
 
-        sinusoidal_check = widgets.Checkbox(
-            value=False, description="Sinusoidal Tracks", disabled=False, indent=False
-        )
-        harmonic_check = widgets.Checkbox(
-            value=False, description="Harmonic Tracks", disabled=False, indent=False
-        )
-        stochastic_audio = widget.Button(
+        self.stochastic_audio = widget.Button(
             description="Stochastic Output",
             button_style="success",
             layout=Layout(width="50%", height="40px"),
         )
+        self.sinusoidal_residual = widget.Button(
+            description="Sinusoidal + Residual",
+            button_style="warning",
+            layout=widgets.Layout(width="50%", height="40px"),
+        )
+        
+        self.sinusoidal_stochastic = widget.Button(
+            description="Sinusoidal + Stochastic",
+            button_style="warning",
+            layout=widgets.Layout(width="50%", height="40px"),
+        )
+
+        self.harmonic_residual = widget.Button(
+            description="Harmonic + Residual",
+            button_style="warning",
+            layout=widgets.Layout(width="50%", height="40px"))
+        self.harmonic_stochastic = widget.Button(
+            description="Harmonic + Stochastic",
+            button_style="warning",
+            layout=widgets.Layout(width="50%", height="40px"))
+        
 
         self.dft = widget.VBox(
             children=[
@@ -225,6 +246,7 @@ class GuiView:
                 self.input_file,
                 self.input_sound,
                 self.mag_spectogram,
+                self.phase_spectogram,
                 self.output_sound,
             ],
             layouts=widgets.Layout(grid_template_columns="repeat(2, 100px)"),
@@ -242,7 +264,7 @@ class GuiView:
                 self.slope_freq_dev,
                 self.input_file,
                 self.input_sound,
-                sinusoidal_tracks,
+                self.sinusoidal_tracks,
                 self.output_sound,
             ]
         )
@@ -261,7 +283,7 @@ class GuiView:
                 self.max_freq_dev_harmonic,
                 self.input_file,
                 self.input_sound,
-                harmonic_tracks,
+                self.harmonic_tracks,
                 self.output_sound,
             ]
         )
@@ -273,7 +295,7 @@ class GuiView:
                 self.dec_factor,
                 self.input_file,
                 self.input_sound,
-                stochastic_rep,
+                self.stochastic_rep,
                 self.output_sound,
             ]
         )
@@ -290,10 +312,9 @@ class GuiView:
                 self.slope_freq_dev,
                 self.input_file,
                 self.input_sound,
-                self.mag_spectogram,
-                sinusoidal_check,
-                sinusoidal_audio,
-                residual_audio,
+                self.sinusoidal_residual,
+                self.sinusoidal_audio,
+                self.residual_audio,
                 self.output_sound,
             ]
         )
@@ -311,10 +332,9 @@ class GuiView:
                 self.stochastic_app_fact,
                 self.input_file,
                 self.input_sound,
-                self.mag_spectogram,
-                sinusoidal_check,
-                sinusoidal_audio,
-                stochastic_audio,
+                self.sinusoidal_stochastic,
+                self.sinusoidal_audio,
+                self.stochastic_audio,
                 self.output_sound,
             ]
         )
@@ -333,10 +353,9 @@ class GuiView:
                 self.max_freq_dev,
                 self.input_file,
                 self.input_sound,
-                self.mag_spectogram,
-                harmonic_check,
-                sinusoidal_audio,
-                residual_audio,
+                self.harmonic_residual,
+                self.sinusoidal_audio,
+                self.residual_audio,
                 self.output_sound,
             ]
         )
@@ -356,10 +375,9 @@ class GuiView:
                 self.stochastic_app_fact,
                 self.input_file,
                 self.input_sound,
-                self.mag_spectogram,
-                harmonic_check,
-                sinusoidal_audio,
-                stochastic_audio,
+                self.harmonic_stochastic,
+                self.sinusoidal_audio,
+                self.stochastic_audio,
                 self.output_sound,
             ]
         )

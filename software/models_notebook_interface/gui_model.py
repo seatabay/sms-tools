@@ -1,20 +1,26 @@
+from class_models import *
+import class_models as Models
 import os
+sys.path.append(os.path.join('../models/'))
+
+import utilFunctions as UF
 
 from collections import defaultdict
 import pathlib
 import json
+import numpy
 
 class GuiModels:
     
-    DFT = dict.fromkeys(["fs", "x1", "mX", "pX", "y"])
-    STFT = dict.fromkeys(["x1","fs", "mX", "pX", "y"])
-    HARMONIC = dict.fromkeys(["fs", "x", "hfreq", "y"])
-    HPR = dict.fromkeys(["fs", "x", "mXr", "hfreq"])
-    HPS = dict.fromkeys(["fs", "x", "y", "stocenv"])
-    SINE = dict.fromkeys(["fs", "x", "tfreq", "y"])
-    SPR = dict.fromkeys(["fs", "x", "tfreq", "mXr", "pXr", "y", "ys"])
-    STOCHASTIC = dict.fromkeys(["fs", "x", "stocenv", "y"])
-    
+    DFT = dict.fromkeys(["fs", "x", "mX", "pX", "y"])
+    STFT = dict.fromkeys(["x","fs", "mX", "pX", "y"])
+    HARMONIC = dict.fromkeys(["fs", "x", "freq", "y", "H"])
+    HPR = dict.fromkeys(["fs", "x", "mX", "freq","y","ys","xr","H"])
+    HPS = dict.fromkeys(["fs", "x", "stocEnv", "freq", "y", "ys", "yst", "H"])
+    SINE = dict.fromkeys(["fs", "x", "freq", "y", "H"])
+    SPR = dict.fromkeys(["fs", "x", "freq", "mX", "pX", "y", "ys","H","xr"])
+    SPS = dict.fromkeys(["fs","x","freq","stocEnv","y","ys","yst","H"])
+    STOCHASTIC = dict.fromkeys(["fs", "x", "stocEnv", "y"])
     DIR_NAME = "Results"
     KEEP_TRACK = 3
     
@@ -63,6 +69,8 @@ class GuiModels:
         
         f = open(filename, "r")
         data = json.loads(f.read())
+        
+
         return data
 
     def limit_computation_number(self, json_file, data, key):
@@ -116,13 +124,16 @@ class GuiModels:
         """
         model_param_dict = {}
         for item in model_widget.children:
-            if hasattr(item, 'accept') and hasattr(item, 'value'):
+            if hasattr(item, 'accept'):
                 model_param_dict[item.description_tooltip] = self.get_selected_audio_filename(item)
-            elif hasattr(item, 'value') and not hasattr(item, 'accept'):
-                if isinstance(item.value, str):
-                    model_param_dict[item.description_tooltip] = item.value.lower()
-                else:
-                    model_param_dict[item.description_tooltip] = item.value
+            else:
+                if hasattr(item, 'value') and not hasattr(item, 'min'):
+                    if isinstance(item.value, str):
+                        model_param_dict[item.description_tooltip] = item.value.lower()
+                    else:
+                        model_param_dict[item.description_tooltip] = item.value
+                elif hasattr(item, 'min'):
+                    model_param_dict[item.description_tooltip] = item.min
         return model_param_dict
                 
     def compute_model_results(
@@ -164,17 +175,15 @@ class GuiModels:
             
         # Otherwise compute the results
         else:
-            print(model_param_dict)
             results = model_func(*tuple(model_param_dict.values()))
             for result, key in zip(results, model_dict.keys()):
                 if isinstance(result, numpy.ndarray):
                     result_dict[key] = result.tolist()
                 else:
                     result_dict[key] = result
-                    
             result_dict.update(model_param_dict)
             result_dict["filename"] = "/".join(filename.split("_"))
-
+            result_dict["model"] = model_name.lower()
             # Keep the number of computations stable
             self.update_json(result_dict, filename)
         return result_dict, filename
@@ -224,4 +233,15 @@ class GuiModels:
         filename = brackets.format(model_name,*tuple(model_param_dict.values()))
         
         return filename
+    
+    def play_sound(self,y,fs,filename):
+        y = np.array(y)
+        filename = "_".join(filename.split("/"))
+        
+        #If the wav file exists, do not overwrite
+        if not pathlib.Path(filename).exists():
+            UF.wavwrite(y, fs, filename)
+        music = pydub.AudioSegment.from_file(filename)
+        play(music)
+        
         
